@@ -1,0 +1,283 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		685773E51C675A7E00B99E1A /* ex-sdl-freetype-harfbuzz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 685773E41C675A7E00B99E1A /* ex-sdl-freetype-harfbuzz.cpp */; };
+		685773E71C675B5F00B99E1A /* SDL2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 685773E61C675B5F00B99E1A /* SDL2.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		685773D81C675A5A00B99E1A /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		685773DA1C675A5A00B99E1A /* freebidi-harfbuzz */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "freebidi-harfbuzz"; sourceTree = BUILT_PRODUCTS_DIR; };
+		685773E41C675A7E00B99E1A /* ex-sdl-freetype-harfbuzz.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "ex-sdl-freetype-harfbuzz.cpp"; sourceTree = SOURCE_ROOT; };
+		685773E61C675B5F00B99E1A /* SDL2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2.framework; path = ../../../../Library/Frameworks/SDL2.framework; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		685773D71C675A5A00B99E1A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				685773E71C675B5F00B99E1A /* SDL2.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		685773D11C675A5A00B99E1A = {
+			isa = PBXGroup;
+			children = (
+				685773E61C675B5F00B99E1A /* SDL2.framework */,
+				685773DC1C675A5A00B99E1A /* freebidi-harfbuzz */,
+				685773DB1C675A5A00B99E1A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		685773DB1C675A5A00B99E1A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				685773DA1C675A5A00B99E1A /* freebidi-harfbuzz */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		685773DC1C675A5A00B99E1A /* freebidi-harfbuzz */ = {
+			isa = PBXGroup;
+			children = (
+				685773E41C675A7E00B99E1A /* ex-sdl-freetype-harfbuzz.cpp */,
+			);
+			path = "freebidi-harfbuzz";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		685773D91C675A5A00B99E1A /* freebidi-harfbuzz */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 685773E11C675A5A00B99E1A /* Build configuration list for PBXNativeTarget "freebidi-harfbuzz" */;
+			buildPhases = (
+				685773D61C675A5A00B99E1A /* Sources */,
+				685773D71C675A5A00B99E1A /* Frameworks */,
+				685773D81C675A5A00B99E1A /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "freebidi-harfbuzz";
+			productName = "freebidi-harfbuzz";
+			productReference = 685773DA1C675A5A00B99E1A /* freebidi-harfbuzz */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		685773D21C675A5A00B99E1A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0720;
+				ORGANIZATIONNAME = Oleg;
+				TargetAttributes = {
+					685773D91C675A5A00B99E1A = {
+						CreatedOnToolsVersion = 7.2.1;
+					};
+				};
+			};
+			buildConfigurationList = 685773D51C675A5A00B99E1A /* Build configuration list for PBXProject "freebidi-harfbuzz" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 685773D11C675A5A00B99E1A;
+			productRefGroup = 685773DB1C675A5A00B99E1A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				685773D91C675A5A00B99E1A /* freebidi-harfbuzz */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		685773D61C675A5A00B99E1A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				685773E51C675A7E00B99E1A /* ex-sdl-freetype-harfbuzz.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		685773DF1C675A5A00B99E1A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		685773E01C675A5A00B99E1A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		685773E21C675A5A00B99E1A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LOCAL_LIBRARY_DIR)/Frameworks",
+				);
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					/usr/local/include/freetype2,
+					/usr/local/include/harfbuzz,
+				);
+				LD_RUNPATH_SEARCH_PATHS = /usr/local/lib;
+				OTHER_LDFLAGS = (
+					"-L/usr/local/lib",
+					"-lfreetype",
+					"-lz",
+					"-lharfbuzz",
+				);
+				PRELINK_LIBS = "-lfreetype -libharfbuzz";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		685773E31C675A5A00B99E1A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(LOCAL_LIBRARY_DIR)/Frameworks",
+				);
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					/usr/local/include/freetype2,
+					/usr/local/include/harfbuzz,
+				);
+				LD_RUNPATH_SEARCH_PATHS = /usr/local/lib;
+				OTHER_LDFLAGS = (
+					"-L/usr/local/lib",
+					"-lfreetype",
+					"-lz",
+					"-lharfbuzz",
+				);
+				PRELINK_LIBS = "-libfreetype2 -libharfbuzz";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		685773D51C675A5A00B99E1A /* Build configuration list for PBXProject "freebidi-harfbuzz" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				685773DF1C675A5A00B99E1A /* Debug */,
+				685773E01C675A5A00B99E1A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		685773E11C675A5A00B99E1A /* Build configuration list for PBXNativeTarget "freebidi-harfbuzz" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				685773E21C675A5A00B99E1A /* Debug */,
+				685773E31C675A5A00B99E1A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 685773D21C675A5A00B99E1A /* Project object */;
+}
