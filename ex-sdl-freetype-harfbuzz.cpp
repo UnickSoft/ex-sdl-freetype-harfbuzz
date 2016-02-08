@@ -14,21 +14,12 @@
 #include <hb-ot.h>
 #include <string>
 
+#include <hb-ot.h>
+#include <vector>
+
 namespace Example
 {
-    
-    const char *text = "Ленивый рыжий кот اللغة العربية";
-    const hb_direction_t text_direction = HB_DIRECTION_LTR;
-    
-    /* XXX: These are not correct, though it doesn't seem to break anything
-     *      regardless of their value. */
-    const char *language = "en";
-    
-    const hb_script_t script = HB_SCRIPT_LATIN;
-    
-    enum {
-        ENGLISH = 0
-    };
+    const wchar_t *text = L"Ленивый рыжий кот اللغة 123العربية شَدَّة";
     
     typedef struct _spanner_baton_t {
         /* rendering part - assumes 32bpp surface */
@@ -221,6 +212,58 @@ namespace Example
     }
     
     
+    // Chunk of text with the same script.
+    struct TextChunk
+    {
+        const wchar_t* text;
+        size_t length;
+        hb_script_t script;
+    };
+    
+    // Split string to chunks.
+    std::vector<TextChunk> SplitToChunks(const wchar_t* text)
+    {
+        std::vector<TextChunk> res;
+        size_t length = wcslen(text);
+
+        hb_unicode_funcs_t* ufuncs = hb_unicode_funcs_get_default();
+        
+        hb_script_t currentScript = hb_unicode_script(ufuncs, text[0]);
+        const wchar_t* chunkStart = text;
+
+        for (size_t i = 1; i < length; i++)
+        {
+            const wchar_t* currentText = &text[i];
+            hb_script_t script = hb_unicode_script(ufuncs, *currentText);
+            
+            // Skip for HB_SCRIPT_INHERITED, because it can be diacritics.
+            if (script != currentScript && script != HB_SCRIPT_INHERITED)
+            {
+                TextChunk chunk;
+                chunk.text   = chunkStart;
+                chunk.length = currentText - chunkStart;
+                chunk.script = currentScript;
+                res.push_back(chunk);
+                
+                chunkStart = currentText;
+                currentScript = script;
+            }
+        }
+        
+        const wchar_t* lastSymbol = &text[length - 1];
+        if (chunkStart <= lastSymbol)
+        {
+            TextChunk chunk;
+            chunk.text   = chunkStart;
+            chunk.length = lastSymbol - chunkStart + 1;
+            chunk.script = currentScript;
+            res.push_back(chunk);
+        }
+        
+        return res;
+    }
+    
+    
     int main () {
         int ptSize = 50*64;
         int device_hdpi = 72;
@@ -271,225 +314,235 @@ namespace Example
         while (!done)
         {
             /* Clear our surface */
-            SDL_FillRect( sdl_surface, NULL, 0 );
+            SDL_FillRect(sdl_surface, NULL, 0 );
             SDL_LockSurface(sdl_surface);
             
-            hb_buffer_set_direction(buf, text_direction); /* or LTR */
-            hb_buffer_set_script(buf, script); /* see hb-unicode.h */
-            hb_buffer_set_language(buf, hb_language_from_string(language, strlen(language)));
-            
-            /* Layout the text */
-            hb_buffer_add_utf8(buf, text, strlen(text), 0, strlen(text));
-            hb_shape(hb_ft_font, buf, NULL, 0);
-            
-            unsigned int         glyph_count;
-            hb_glyph_info_t     *glyph_info   = hb_buffer_get_glyph_infos(buf, &glyph_count);
-            hb_glyph_position_t *glyph_pos    = hb_buffer_get_glyph_positions(buf, &glyph_count);
-            
-            /* set up rendering via spanners */
-            spanner_baton_t stuffbaton;
-            
-            FT_Raster_Params ftr_params;
-            ftr_params.target = 0;
-            ftr_params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_AA;
-            ftr_params.user = &stuffbaton;
-            ftr_params.black_spans = 0;
-            ftr_params.bit_set = 0;
-            ftr_params.bit_test = 0;
-            
-            /* Calculate string bounding box in pixels */
-            ftr_params.gray_spans = spanner_sizer;
-            
-            /* See http://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html */
-            
-            int max_x = INT_MIN; // largest coordinate a pixel has been set at, or the pen was advanced to.
-            int min_x = INT_MAX; // smallest coordinate a pixel has been set at, or the pen was advanced to.
-            int max_y = INT_MIN; // this is max topside bearing along the string.
-            int min_y = INT_MAX; // this is max value of (height - topbearing) along the string.
-            /*  Naturally, the above comments swap their meaning between horizontal and vertical scripts,
-             since the pen changes the axis it is advanced along.
-             However, their differences still make up the bounding box for the string.
-             Also note that all this is in FT coordinate system where y axis points upwards.
-             */
-            
-            int sizer_x = 0;
-            int sizer_y = 0; /* in FT coordinate system. */
-            
-            FT_Error fterr;
-            for (unsigned j = 0; j < glyph_count; ++j) {
-                if ((fterr = FT_Load_Glyph(ft_face, glyph_info[j].codepoint, 0))) {
-                    printf("load %08x failed fterr=%d.\n",  glyph_info[j].codepoint, fterr);
-                } else {
-                    if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
-                        printf("glyph->format = %4s\n", (char *)&ft_face->glyph->format);
-                    } else {
-                        int gx = sizer_x + (glyph_pos[j].x_offset/64);
-                        int gy = sizer_y + (glyph_pos[j].y_offset/64); // note how the sign differs from the rendering pass
-                        
-                        stuffbaton.min_span_x = INT_MAX;
-                        stuffbaton.max_span_x = INT_MIN;
-                        stuffbaton.min_y = INT_MAX;
-                        stuffbaton.max_y = INT_MIN;
-                        
-                        if ((fterr = FT_Outline_Render(ft_library, &ft_face->glyph->outline, &ftr_params)))
-                            printf("FT_Outline_Render() failed err=%d\n", fterr);
-                        
-                        if (stuffbaton.min_span_x != INT_MAX) {
-                            /* Update values if the spanner was actually called. */
-                            if (min_x > stuffbaton.min_span_x + gx)
-                                min_x = stuffbaton.min_span_x + gx;
-                            
-                            if (max_x < stuffbaton.max_span_x + gx)
-                                max_x = stuffbaton.max_span_x + gx;
-                            
-                            if (min_y > stuffbaton.min_y + gy)
-                                min_y = stuffbaton.min_y + gy;
-                            
-                            if (max_y < stuffbaton.max_y + gy)
-                                max_y = stuffbaton.max_y + gy;
-                        } else {
-                            /* The spanner wasn't called at all - an empty glyph, like space. */
-                            if (min_x > gx) min_x = gx;
-                            if (max_x < gx) max_x = gx;
-                            if (min_y > gy) min_y = gy;
-                            if (max_y < gy) max_y = gy;
-                        }
-                    }
-                }
-                
-                sizer_x += glyph_pos[j].x_advance/64;
-                sizer_y += glyph_pos[j].y_advance/64; // note how the sign differs from the rendering pass
-                
-            }
-            
-            /* Still have to take into account last glyph's advance. Or not? */
-            if (min_x > sizer_x) min_x = sizer_x;
-            if (max_x < sizer_x) max_x = sizer_x;
-            if (min_y > sizer_y) min_y = sizer_y;
-            if (max_y < sizer_y) max_y = sizer_y;
-            
-            /* The bounding box */
-            int bbox_w = max_x - min_x;
-            int bbox_h = max_y - min_y;
-            
-            /* Two offsets below position the bounding box with respect to the 'origin',
-             which is sort of origin of string's first glyph.
-             
-             baseline_offset - offset perpendecular to the baseline to the topmost (horizontal),
-             or leftmost (vertical) pixel drawn.
-             
-             baseline_shift  - offset along the baseline, from the first drawn glyph's origin
-             to the leftmost (horizontal), or topmost (vertical) pixel drawn.
-             
-             Thus those offsets allow positioning the bounding box to fit the rendered string,
-             as they are in fact offsets from the point given to the renderer, to the top left
-             corner of the bounding box.
-             
-             NB: baseline is defined as y==0 for horizontal and x==0 for vertical scripts.
-             (0,0) here is where the first glyph's origin ended up after shaping, not taking
-             into account glyph_pos[0].xy_offset (yeah, my head hurts too).
-             */
-            
-            int baseline_offset;
-            int baseline_shift;
-            
-            if (HB_DIRECTION_IS_HORIZONTAL(hb_buffer_get_direction(buf))) {
-                baseline_offset = max_y;
-                baseline_shift  = min_x;
-            }
-            if (HB_DIRECTION_IS_VERTICAL(hb_buffer_get_direction(buf))) {
-                baseline_offset = min_x;
-                baseline_shift  = max_y;
-            }
-            
-            if (resized)
-                printf("string min_x=%d max_x=%d min_y=%d max_y=%d bbox %dx%d boffs %d,%d\n",
-                       min_x, max_x, min_y, max_y, bbox_w, bbox_h, baseline_offset, baseline_shift);
+            // Split text string to text chunks.
+            std::vector<TextChunk> textChunks = SplitToChunks(text);
             
             /* The pen/baseline start coordinates in window coordinate system
              - with those text placement in the window is controlled.
              - note that for RTL scripts pen still goes LTR */
             int x = 0, y = 50 + 75;
             x = 20;
-            /*
-             /* Draw baseline and the bounding box */
-            /* The below is complicated since we simultaneously
-             convert to the window coordinate system. */
-            int left, right, top, bottom;
             
-            if (HB_DIRECTION_IS_HORIZONTAL(hb_buffer_get_direction(buf))) {
-                /* bounding box in window coordinates without offsets */
-                left   = x;
-                right  = x + bbox_w;
-                top    = y - bbox_h;
-                bottom = y;
-                
-                /* apply offsets */
-                left   +=  baseline_shift;
-                right  +=  baseline_shift;
-                top    -=  baseline_offset - bbox_h;
-                bottom -=  baseline_offset - bbox_h;
-                
-                /* draw the baseline */
-                hline(sdl_surface, x, x + bbox_w, y, 0x0000ff00);
-            }
-            
-            if (HB_DIRECTION_IS_VERTICAL(hb_buffer_get_direction(buf))) {
-                left   = x;
-                right  = x + bbox_w;
-                top    = y;
-                bottom = y + bbox_h;
-                
-                left   += baseline_offset;
-                right  += baseline_offset;
-                top    -= baseline_shift;
-                bottom -= baseline_shift;
-                
-                vline(sdl_surface, y, y + bbox_h, x, 0x0000ff00);
-            }
-            if (resized)
-                printf("origin %d,%d bbox l=%d r=%d t=%d b=%d\n",
-                       x, y, left, right, top, bottom);
-            
-            /* +1/-1 are for the bbox borders be the next pixel outside the bbox itself */
-            hline(sdl_surface, left - 1, right + 1, top - 1, 0x00ff0000);
-            hline(sdl_surface, left - 1, right + 1, bottom + 1, 0x00ff0000);
-            vline(sdl_surface, top - 1, bottom + 1, left - 1, 0x00ff0000);
-            vline(sdl_surface, top - 1, bottom + 1, right + 1, 0x00ff0000);
-            
-            /* set rendering spanner */
-            ftr_params.gray_spans = spanner;
-            
-            /* initialize rendering part of the baton */
-            stuffbaton.pixels = NULL;
-            stuffbaton.first_pixel = (uint32_t*)sdl_surface->pixels;
-            stuffbaton.last_pixel = (uint32_t *) (((uint8_t *) sdl_surface->pixels) + sdl_surface->pitch*sdl_surface->h);
-            stuffbaton.pitch = sdl_surface->pitch;
-            stuffbaton.rshift = sdl_surface->format->Rshift;
-            stuffbaton.gshift = sdl_surface->format->Gshift;
-            stuffbaton.bshift = sdl_surface->format->Bshift;
-            
-            /* render */
-            for (unsigned j=0; j < glyph_count; ++j)
+            for (std::vector<TextChunk>::iterator chunk = textChunks.begin();
+                 chunk != textChunks.end(); chunk++)
             {
-                if ((fterr = FT_Load_Glyph(ft_face, glyph_info[j].codepoint, 0))) {
-                    printf("load %08x failed fterr=%d.\n",  glyph_info[j].codepoint, fterr);
-                } else {
-                    if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
-                        printf("glyph->format = %4s\n", (char *)&ft_face->glyph->format);
+                hb_direction_t dir = hb_script_get_horizontal_direction(chunk->script);
+                hb_buffer_set_direction(buf, dir); /* or LTR */
+                hb_buffer_set_script(buf, chunk->script); /* see hb-unicode.h */
+                //hb_buffer_set_language(buf, hb_language_from_string(language, strlen(language)));
+                
+                /* Layout the text */
+                hb_buffer_add_utf32(buf, (const uint32_t*)chunk->text, chunk->length, 0, chunk->length);
+                hb_shape(hb_ft_font, buf, NULL, 0);
+                
+                unsigned int         glyph_count;
+                hb_glyph_info_t     *glyph_info   = hb_buffer_get_glyph_infos(buf, &glyph_count);
+                hb_glyph_position_t *glyph_pos    = hb_buffer_get_glyph_positions(buf, &glyph_count);
+                
+                /* set up rendering via spanners */
+                spanner_baton_t stuffbaton;
+                
+                FT_Raster_Params ftr_params;
+                ftr_params.target = 0;
+                ftr_params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_AA;
+                ftr_params.user = &stuffbaton;
+                ftr_params.black_spans = 0;
+                ftr_params.bit_set = 0;
+                ftr_params.bit_test = 0;
+                
+                /* Calculate string bounding box in pixels */
+                ftr_params.gray_spans = spanner_sizer;
+                
+                /* See http://www.freetype.org/freetype2/docs/glyphs/glyphs-3.html */
+                
+                int max_x = INT_MIN; // largest coordinate a pixel has been set at, or the pen was advanced to.
+                int min_x = INT_MAX; // smallest coordinate a pixel has been set at, or the pen was advanced to.
+                int max_y = INT_MIN; // this is max topside bearing along the string.
+                int min_y = INT_MAX; // this is max value of (height - topbearing) along the string.
+                /*  Naturally, the above comments swap their meaning between horizontal and vertical scripts,
+                 since the pen changes the axis it is advanced along.
+                 However, their differences still make up the bounding box for the string.
+                 Also note that all this is in FT coordinate system where y axis points upwards.
+                 */
+                
+                int sizer_x = 0;
+                int sizer_y = 0; /* in FT coordinate system. */
+                
+                FT_Error fterr;
+                for (unsigned j = 0; j < glyph_count; ++j) {
+                    if ((fterr = FT_Load_Glyph(ft_face, glyph_info[j].codepoint, 0))) {
+                        printf("load %08x failed fterr=%d.\n",  glyph_info[j].codepoint, fterr);
                     } else {
-                        int gx = x + (glyph_pos[j].x_offset/64);
-                        int gy = y - (glyph_pos[j].y_offset/64);
-                        
-                        stuffbaton.pixels = (uint32_t *)(((uint8_t *) sdl_surface->pixels) + gy * sdl_surface->pitch) + gx;
-                        
-                        if ((fterr = FT_Outline_Render(ft_library, &ft_face->glyph->outline, &ftr_params)))
-                            printf("FT_Outline_Render() failed err=%d\n", fterr);
+                        if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+                            printf("glyph->format = %4s\n", (char *)&ft_face->glyph->format);
+                        } else {
+                            int gx = sizer_x + (glyph_pos[j].x_offset/64);
+                            int gy = sizer_y + (glyph_pos[j].y_offset/64); // note how the sign differs from the rendering pass
+                            
+                            stuffbaton.min_span_x = INT_MAX;
+                            stuffbaton.max_span_x = INT_MIN;
+                            stuffbaton.min_y = INT_MAX;
+                            stuffbaton.max_y = INT_MIN;
+                            
+                            if ((fterr = FT_Outline_Render(ft_library, &ft_face->glyph->outline, &ftr_params)))
+                                printf("FT_Outline_Render() failed err=%d\n", fterr);
+                            
+                            if (stuffbaton.min_span_x != INT_MAX) {
+                                /* Update values if the spanner was actually called. */
+                                if (min_x > stuffbaton.min_span_x + gx)
+                                    min_x = stuffbaton.min_span_x + gx;
+                                
+                                if (max_x < stuffbaton.max_span_x + gx)
+                                    max_x = stuffbaton.max_span_x + gx;
+                                
+                                if (min_y > stuffbaton.min_y + gy)
+                                    min_y = stuffbaton.min_y + gy;
+                                
+                                if (max_y < stuffbaton.max_y + gy)
+                                    max_y = stuffbaton.max_y + gy;
+                            } else {
+                                /* The spanner wasn't called at all - an empty glyph, like space. */
+                                if (min_x > gx) min_x = gx;
+                                if (max_x < gx) max_x = gx;
+                                if (min_y > gy) min_y = gy;
+                                if (max_y < gy) max_y = gy;
+                            }
+                        }
                     }
+                    
+                    sizer_x += glyph_pos[j].x_advance/64;
+                    sizer_y += glyph_pos[j].y_advance/64; // note how the sign differs from the rendering pass
+                    
                 }
                 
-                x += glyph_pos[j].x_advance/64;
-                y -= glyph_pos[j].y_advance/64;
+                /* Still have to take into account last glyph's advance. Or not? */
+                if (min_x > sizer_x) min_x = sizer_x;
+                if (max_x < sizer_x) max_x = sizer_x;
+                if (min_y > sizer_y) min_y = sizer_y;
+                if (max_y < sizer_y) max_y = sizer_y;
+                
+                /* The bounding box */
+                int bbox_w = max_x - min_x;
+                int bbox_h = max_y - min_y;
+                
+                /* Two offsets below position the bounding box with respect to the 'origin',
+                 which is sort of origin of string's first glyph.
+                 
+                 baseline_offset - offset perpendecular to the baseline to the topmost (horizontal),
+                 or leftmost (vertical) pixel drawn.
+                 
+                 baseline_shift  - offset along the baseline, from the first drawn glyph's origin
+                 to the leftmost (horizontal), or topmost (vertical) pixel drawn.
+                 
+                 Thus those offsets allow positioning the bounding box to fit the rendered string,
+                 as they are in fact offsets from the point given to the renderer, to the top left
+                 corner of the bounding box.
+                 
+                 NB: baseline is defined as y==0 for horizontal and x==0 for vertical scripts.
+                 (0,0) here is where the first glyph's origin ended up after shaping, not taking
+                 into account glyph_pos[0].xy_offset (yeah, my head hurts too).
+                 */
+                
+                int baseline_offset;
+                int baseline_shift;
+                
+                if (HB_DIRECTION_IS_HORIZONTAL(hb_buffer_get_direction(buf))) {
+                    baseline_offset = max_y;
+                    baseline_shift  = min_x;
+                }
+                if (HB_DIRECTION_IS_VERTICAL(hb_buffer_get_direction(buf))) {
+                    baseline_offset = min_x;
+                    baseline_shift  = max_y;
+                }
+                
+                if (resized)
+                    printf("string min_x=%d max_x=%d min_y=%d max_y=%d bbox %dx%d boffs %d,%d\n",
+                           min_x, max_x, min_y, max_y, bbox_w, bbox_h, baseline_offset, baseline_shift);
+                /*
+                 /* Draw baseline and the bounding box */
+                /* The below is complicated since we simultaneously
+                 convert to the window coordinate system. */
+                int left, right, top, bottom;
+                
+                if (HB_DIRECTION_IS_HORIZONTAL(hb_buffer_get_direction(buf))) {
+                    /* bounding box in window coordinates without offsets */
+                    left   = x;
+                    right  = x + bbox_w;
+                    top    = y - bbox_h;
+                    bottom = y;
+                    
+                    /* apply offsets */
+                    left   +=  baseline_shift;
+                    right  +=  baseline_shift;
+                    top    -=  baseline_offset - bbox_h;
+                    bottom -=  baseline_offset - bbox_h;
+                    
+                    /* draw the baseline */
+                    hline(sdl_surface, x, x + bbox_w, y, 0x0000ff00);
+                }
+                
+                if (HB_DIRECTION_IS_VERTICAL(hb_buffer_get_direction(buf))) {
+                    left   = x;
+                    right  = x + bbox_w;
+                    top    = y;
+                    bottom = y + bbox_h;
+                    
+                    left   += baseline_offset;
+                    right  += baseline_offset;
+                    top    -= baseline_shift;
+                    bottom -= baseline_shift;
+                    
+                    vline(sdl_surface, y, y + bbox_h, x, 0x0000ff00);
+                }
+                if (resized)
+                    printf("origin %d,%d bbox l=%d r=%d t=%d b=%d\n",
+                           x, y, left, right, top, bottom);
+                
+                /* +1/-1 are for the bbox borders be the next pixel outside the bbox itself */
+                hline(sdl_surface, left - 1, right + 1, top - 1, 0x00ff0000);
+                hline(sdl_surface, left - 1, right + 1, bottom + 1, 0x00ff0000);
+                vline(sdl_surface, top - 1, bottom + 1, left - 1, 0x00ff0000);
+                vline(sdl_surface, top - 1, bottom + 1, right + 1, 0x00ff0000);
+                
+                /* set rendering spanner */
+                ftr_params.gray_spans = spanner;
+                
+                /* initialize rendering part of the baton */
+                stuffbaton.pixels = NULL;
+                stuffbaton.first_pixel = (uint32_t*)sdl_surface->pixels;
+                stuffbaton.last_pixel = (uint32_t *) (((uint8_t *) sdl_surface->pixels) + sdl_surface->pitch*sdl_surface->h);
+                stuffbaton.pitch = sdl_surface->pitch;
+                stuffbaton.rshift = sdl_surface->format->Rshift;
+                stuffbaton.gshift = sdl_surface->format->Gshift;
+                stuffbaton.bshift = sdl_surface->format->Bshift;
+                
+                /* render */
+                for (unsigned j=0; j < glyph_count; ++j)
+                {
+                    if ((fterr = FT_Load_Glyph(ft_face, glyph_info[j].codepoint, 0))) {
+                        printf("load %08x failed fterr=%d.\n",  glyph_info[j].codepoint, fterr);
+                    } else {
+                        if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+                            printf("glyph->format = %4s\n", (char *)&ft_face->glyph->format);
+                        } else {
+                            int gx = x + (glyph_pos[j].x_offset/64);
+                            int gy = y - (glyph_pos[j].y_offset/64);
+                            
+                            stuffbaton.pixels = (uint32_t *)(((uint8_t *) sdl_surface->pixels) + gy * sdl_surface->pitch) + gx;
+                            
+                            if ((fterr = FT_Outline_Render(ft_library, &ft_face->glyph->outline, &ftr_params)))
+                                printf("FT_Outline_Render() failed err=%d\n", fterr);
+                        }
+                    }
+                    
+                    x += glyph_pos[j].x_advance/64;
+                    y -= glyph_pos[j].y_advance/64;
+                }
+                
+                hb_buffer_clear_contents(buf);
             }
             
             /* clean up the buffer, but don't kill it just yet */
