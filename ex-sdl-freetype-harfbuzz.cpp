@@ -17,6 +17,8 @@
 #include <hb-ot.h>
 #include <vector>
 
+#include <fribidi.h>
+
 namespace Example
 {
     const wchar_t *text = L"Ленивый рыжий кот اللغة 123العربية شَدَّة";
@@ -167,7 +169,7 @@ namespace Example
         }
     }
     
-    hb_font_t* create_font_from_file(std::string filename, int index = 0)
+    hb_font_t* createFontFromFile(std::string filename, int index)
     {
         hb_font_t* font = NULL;
         
@@ -200,7 +202,7 @@ namespace Example
     
     hb_font_t* getHBFont(std::string name, FT_Face ft_face)
     {
-        hb_font_t* font = create_font_from_file(name, 0);
+        hb_font_t* font = createFontFromFile(name, 0);
         if (font)
         {
             int nXScale = (int) (((uint64_t) ft_face->size->metrics.x_scale * (uint64_t) ft_face->units_per_EM + (1<<15)) >> 16);
@@ -220,20 +222,83 @@ namespace Example
         hb_script_t script;
     };
     
+    
+    // Use FriBiDI to sort text in right bi direction sequence
+    wchar_t* getVisibleText(const wchar_t* text)
+    {
+        int nLineSize = wcslen(text);
+        
+        uint* pTempLogicalLine = new uint[nLineSize];
+        uint* pTempVisualLine  = new uint[nLineSize];
+        FriBidiStrIndex* pTempPositionLogicToVisual = new FriBidiStrIndex[nLineSize];
+        FriBidiCharType* pTempBidiTypes    = new FriBidiCharType[nLineSize];
+        FriBidiLevel* pTempEmbeddingLevels = new FriBidiLevel[nLineSize];
+        FriBidiJoiningType* pTempJtypes    = new FriBidiJoiningType[nLineSize];
+        FriBidiArabicProp*  pTempArProps   = new FriBidiArabicProp[nLineSize];
+        
+        for (int i = 0; i < nLineSize; ++i)
+        {
+            pTempLogicalLine[i] = text[i];
+        }
+        
+        // Get letter types.
+        fribidi_get_bidi_types(pTempLogicalLine, nLineSize, pTempBidiTypes);
+        
+        FriBidiParType baseDirection = FRIBIDI_PAR_LTR;
+        FriBidiLevel   resolveParDir = fribidi_get_par_embedding_levels(pTempBidiTypes, nLineSize, &baseDirection, pTempEmbeddingLevels);
+
+        // joine types.
+        fribidi_get_joining_types(pTempLogicalLine, nLineSize, pTempJtypes);
+        
+        // arabic join.
+        memcpy(pTempArProps, pTempJtypes, nLineSize * sizeof(FriBidiJoiningType));
+        fribidi_join_arabic(pTempBidiTypes, nLineSize, pTempEmbeddingLevels, pTempArProps);
+        
+        // shapes.
+        fribidi_shape (FRIBIDI_FLAG_SHAPE_MIRRORING | FRIBIDI_FLAG_SHAPE_ARAB_PRES | FRIBIDI_FLAG_SHAPE_ARAB_LIGA,
+                       pTempEmbeddingLevels, nLineSize, pTempArProps, pTempLogicalLine);
+        
+        memcpy(pTempVisualLine, pTempLogicalLine, nLineSize * sizeof(uint));
+        memset(pTempPositionLogicToVisual, 0, nLineSize * sizeof(FriBidiStrIndex));
+        
+        FriBidiLevel levels = fribidi_reorder_line(FRIBIDI_FLAGS_ARABIC, pTempBidiTypes, nLineSize,
+                                                0, baseDirection,  pTempEmbeddingLevels, pTempVisualLine, pTempPositionLogicToVisual);
+        
+        wchar_t* res = new wchar_t[nLineSize + 1];
+        
+        // Result is string with correct position for each letter.
+        for (int i = 0; i < nLineSize; ++i)
+        {
+            res[i] = pTempVisualLine[i];
+        }
+        res [nLineSize] = 0;
+        
+        if (pTempJtypes) { delete[] pTempJtypes;}
+        if (pTempArProps) { delete[] pTempArProps;}
+        if (pTempLogicalLine) { delete[] pTempLogicalLine;}
+        if (pTempEmbeddingLevels) { delete[] pTempEmbeddingLevels;}
+        if (pTempBidiTypes) { delete[] pTempBidiTypes;}
+        if (pTempVisualLine) { delete[] pTempVisualLine;}
+        if (pTempPositionLogicToVisual) { delete[] pTempPositionLogicToVisual;}
+        
+        return res;
+    }
+
     // Split string to chunks.
-    std::vector<TextChunk> SplitToChunks(const wchar_t* text)
+    std::vector<TextChunk> splitToChunks(const wchar_t* visibleText)
     {
         std::vector<TextChunk> res;
-        size_t length = wcslen(text);
+        
+        size_t length = wcslen(visibleText);
 
         hb_unicode_funcs_t* ufuncs = hb_unicode_funcs_get_default();
         
-        hb_script_t currentScript = hb_unicode_script(ufuncs, text[0]);
-        const wchar_t* chunkStart = text;
+        hb_script_t currentScript = hb_unicode_script(ufuncs, visibleText[0]);
+        const wchar_t* chunkStart = visibleText;
 
         for (size_t i = 1; i < length; i++)
         {
-            const wchar_t* currentText = &text[i];
+            const wchar_t* currentText = &visibleText[i];
             hb_script_t script = hb_unicode_script(ufuncs, *currentText);
             
             // Skip for HB_SCRIPT_INHERITED, because it can be diacritics.
@@ -250,7 +315,7 @@ namespace Example
             }
         }
         
-        const wchar_t* lastSymbol = &text[length - 1];
+        const wchar_t* lastSymbol = &visibleText[length - 1];
         if (chunkStart <= lastSymbol)
         {
             TextChunk chunk;
@@ -305,8 +370,15 @@ namespace Example
         /* Create an SDL image surface we can draw to */
         SDL_Surface *sdl_surface = SDL_CreateRGBSurface (0, width, height, 32, 0,0,0,0);
         
+        SDL_Renderer *renderer = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
+        
         /* Create a buffer for harfbuzz to use */
         hb_buffer_t *buf = hb_buffer_create();
+        
+        /* Run fribidi to get correct postion for each letter */
+        const wchar_t* visibleText = getVisibleText(text);
+        // Split text string to text chunks.
+        std::vector<TextChunk> textChunks = splitToChunks(visibleText);
         
         /* Our main event/draw loop */
         int done = 0;
@@ -317,9 +389,6 @@ namespace Example
             SDL_FillRect(sdl_surface, NULL, 0 );
             SDL_LockSurface(sdl_surface);
             
-            // Split text string to text chunks.
-            std::vector<TextChunk> textChunks = SplitToChunks(text);
-            
             /* The pen/baseline start coordinates in window coordinate system
              - with those text placement in the window is controlled.
              - note that for RTL scripts pen still goes LTR */
@@ -329,8 +398,9 @@ namespace Example
             for (std::vector<TextChunk>::iterator chunk = textChunks.begin();
                  chunk != textChunks.end(); chunk++)
             {
-                hb_direction_t dir = hb_script_get_horizontal_direction(chunk->script);
-                hb_buffer_set_direction(buf, dir); /* or LTR */
+                // hb_direction_t dir = hb_script_get_horizontal_direction(chunk->script);
+                /* We always use HB_DIRECTION_LTR, because fribidi already made correct direction. */
+                hb_buffer_set_direction(buf, HB_DIRECTION_LTR/*dir*/); /* or LTR */
                 hb_buffer_set_script(buf, chunk->script); /* see hb-unicode.h */
                 //hb_buffer_set_language(buf, hb_language_from_string(language, strlen(language)));
                 
@@ -554,12 +624,11 @@ namespace Example
             
             /* Blit our new image to our visible screen */
             
-            SDL_Renderer *renderer = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
-            SDL_Texture  *sdlTexture = SDL_CreateTextureFromSurface(renderer, sdl_surface);
-            
             SDL_RenderClear(renderer);
+            SDL_Texture  *sdlTexture = SDL_CreateTextureFromSurface(renderer, sdl_surface);
             SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
             SDL_RenderPresent(renderer);
+            SDL_DestroyTexture(sdlTexture);
             
             /* Handle SDL events */
             SDL_Event event;
@@ -595,6 +664,7 @@ namespace Example
             SDL_Delay(150);
         }
         
+        
         /* Cleanup */
         hb_buffer_destroy(buf);
         hb_font_destroy(hb_ft_font);
@@ -602,6 +672,12 @@ namespace Example
         FT_Done_FreeType(ft_library);
         
         SDL_FreeSurface(sdl_surface);
+        
+        delete[] visibleText;
+        
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(screen);
+        
         SDL_Quit();
         
         return 0;

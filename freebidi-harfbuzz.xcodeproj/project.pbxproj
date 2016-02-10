@@ -219,6 +219,7 @@
 					/usr/local/include,
 					/usr/local/include/freetype2,
 					/usr/local/include/harfbuzz,
+					/usr/local/include/fribidi,
 				);
 				LD_RUNPATH_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
@@ -226,8 +227,9 @@
 					"-lfreetype",
 					"-lz",
 					"-lharfbuzz",
+					"-lfribidi",
 				);
-				PRELINK_LIBS = "-lfreetype -libharfbuzz";
+				PRELINK_LIBS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -243,6 +245,7 @@
 					/usr/local/include,
 					/usr/local/include/freetype2,
 					/usr/local/include/harfbuzz,
+					/usr/local/include/fribidi,
 				);
 				LD_RUNPATH_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
@@ -250,8 +253,9 @@
 					"-lfreetype",
 					"-lz",
 					"-lharfbuzz",
+					"-lfribidi",
 				);
-				PRELINK_LIBS = "-libfreetype2 -libharfbuzz";
+				PRELINK_LIBS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
