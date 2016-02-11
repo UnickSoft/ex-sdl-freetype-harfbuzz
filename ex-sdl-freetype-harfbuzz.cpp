@@ -21,7 +21,7 @@
 
 namespace Example
 {
-    const wchar_t *text = L"Ленивый рыжий кот اللغة 123العربية شَدَّة";
+    const wchar_t *text = L"Ленивый рыжий кот شَدَّة latin العَرَبِية";
     
     typedef struct _spanner_baton_t {
         /* rendering part - assumes 32bpp surface */
@@ -151,21 +151,21 @@ namespace Example
         return -1;
     }
     
-    void hline(SDL_Surface *s, int min_x, int max_x, int y, uint32_t color) {
-        uint32_t *pix = (uint32_t *)s->pixels + (y * s->pitch) / 4 + min_x;
-        uint32_t *end = (uint32_t *)s->pixels + (y * s->pitch) / 4 + max_x;
+    void hline(char* pixels, int pitch, int min_x, int max_x, int y, uint32_t color) {
+        uint32_t *pix = (uint32_t *)pixels + (y * pitch) / 4 + min_x;
+        uint32_t *end = (uint32_t *)pixels + (y * pitch) / 4 + max_x;
         
         while (pix - 1 != end)
             *pix++ = color;
     }
     
-    void vline(SDL_Surface *s, int min_y, int max_y, int x, uint32_t color) {
-        uint32_t *pix = (uint32_t *)s->pixels + (min_y * s->pitch) / 4 + x;
-        uint32_t *end = (uint32_t *)s->pixels + (max_y * s->pitch) / 4 + x;
+    void vline(char* pixels, int pitch, int min_y, int max_y, int x, uint32_t color) {
+        uint32_t *pix = (uint32_t *)pixels + (min_y * pitch) / 4 + x;
+        uint32_t *end = (uint32_t *)pixels + (max_y * pitch) / 4 + x;
         
-        while (pix - s->pitch/4 != end) {
+        while (pix - pitch/4 != end) {
             *pix = color;
-            pix += s->pitch/4;
+            pix += pitch/4;
         }
     }
     
@@ -224,7 +224,7 @@ namespace Example
     
     
     // Use FriBiDI to sort text in right bi direction sequence
-    wchar_t* getVisibleText(const wchar_t* text)
+    FriBidiStrIndex* getReorderingMap(const wchar_t* text)
     {
         int nLineSize = wcslen(text);
         
@@ -259,19 +259,13 @@ namespace Example
                        pTempEmbeddingLevels, nLineSize, pTempArProps, pTempLogicalLine);
         
         memcpy(pTempVisualLine, pTempLogicalLine, nLineSize * sizeof(uint));
-        memset(pTempPositionLogicToVisual, 0, nLineSize * sizeof(FriBidiStrIndex));
+        for (int i = 0; i < nLineSize; i ++)
+        {
+            pTempPositionLogicToVisual[i] = i;
+        }
         
         FriBidiLevel levels = fribidi_reorder_line(FRIBIDI_FLAGS_ARABIC, pTempBidiTypes, nLineSize,
                                                 0, baseDirection,  pTempEmbeddingLevels, pTempVisualLine, pTempPositionLogicToVisual);
-        
-        wchar_t* res = new wchar_t[nLineSize + 1];
-        
-        // Result is string with correct position for each letter.
-        for (int i = 0; i < nLineSize; ++i)
-        {
-            res[i] = pTempVisualLine[i];
-        }
-        res [nLineSize] = 0;
         
         if (pTempJtypes) { delete[] pTempJtypes;}
         if (pTempArProps) { delete[] pTempArProps;}
@@ -279,9 +273,8 @@ namespace Example
         if (pTempEmbeddingLevels) { delete[] pTempEmbeddingLevels;}
         if (pTempBidiTypes) { delete[] pTempBidiTypes;}
         if (pTempVisualLine) { delete[] pTempVisualLine;}
-        if (pTempPositionLogicToVisual) { delete[] pTempPositionLogicToVisual;}
         
-        return res;
+        return pTempPositionLogicToVisual;
     }
 
     // Split string to chunks.
@@ -338,21 +331,24 @@ namespace Example
         FT_Library ft_library;
         assert(!FT_Init_FreeType(&ft_library));
         
+        
+        std::string cppFile(__FILE__);
+        std::string sourceFolder = cppFile.substr(0, cppFile.rfind("/"));
+        std::string fontFilename = sourceFolder + "/fonts/arial.ttf";
+        
         /* Load our fonts */
         FT_Face ft_face;
-        assert(!FT_New_Face(ft_library, "/Volumes/Dev/projects/ex-sdl-freetype-harfbuzz/fonts/arial.ttf", 0, &ft_face));
+        assert(!FT_New_Face(ft_library, fontFilename.c_str(), 0, &ft_face));
         assert(!FT_Set_Char_Size(ft_face, 0, ptSize, device_hdpi, device_vdpi ));
         ftfdump(ft_face); // wonderful world of encodings ...
         force_ucs2_charmap(ft_face); // which we ignore.
         
         /* Get our harfbuzz font structs */
-        hb_font_t *hb_ft_font = getHBFont("/Volumes/Dev/projects/ex-sdl-freetype-harfbuzz/fonts/arial.ttf", ft_face);
+        hb_font_t *hb_ft_font = getHBFont(fontFilename.c_str(), ft_face);
         
         /** Setup our SDL window **/
         int width      = 1000;
         int height     = 300;
-        //int videoFlags = SDL_SWSURFACE | SDL_RESIZABLE | SDL_DOUBLEBUF;
-        int bpp        = 32;
         
         /* Initialize our SDL window */
         if(SDL_Init(SDL_INIT_VIDEO) < 0)
@@ -361,22 +357,22 @@ namespace Example
             return -1;
         }
         
-        SDL_Window *screen = SDL_CreateWindow("HarfBuzz+FreebidiExample",
+        SDL_Window *screen = SDL_CreateWindow("SDL2 + FreeType + HarfBuzz + FriBiDi Example",
                                               SDL_WINDOWPOS_UNDEFINED,
                                               SDL_WINDOWPOS_UNDEFINED,
                                               width, height,
                                               SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
         
-        /* Create an SDL image surface we can draw to */
-        SDL_Surface *sdl_surface = SDL_CreateRGBSurface (0, width, height, 32, 0,0,0,0);
-        
-        SDL_Renderer *renderer = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
+        /* Create an SDL texture we can draw to */
+        SDL_Renderer *renderer   = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
+        SDL_Texture  *sdlTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
         
         /* Create a buffer for harfbuzz to use */
         hb_buffer_t *buf = hb_buffer_create();
         
         /* Run fribidi to get correct postion for each letter */
-        const wchar_t* visibleText = getVisibleText(text);
+        FriBidiStrIndex* reorderPosition = getReorderingMap(text);
+        const wchar_t* visibleText = text;
         // Split text string to text chunks.
         std::vector<TextChunk> textChunks = splitToChunks(visibleText);
         
@@ -385,9 +381,18 @@ namespace Example
         int resized = 1;
         while (!done)
         {
-            /* Clear our surface */
-            SDL_FillRect(sdl_surface, NULL, 0 );
-            SDL_LockSurface(sdl_surface);
+            SDL_Rect rect = {0, 0, width, height};
+            
+            char*          pixels = NULL;
+            int            pitch = 0;
+            
+            /* Clear our texture */
+            SDL_LockTexture(sdlTexture,
+                            &rect,
+                            (void**)&pixels,
+                            &pitch);
+            
+            memset(pixels, 0, pitch * height);
             
             /* The pen/baseline start coordinates in window coordinate system
              - with those text placement in the window is controlled.
@@ -398,9 +403,8 @@ namespace Example
             for (std::vector<TextChunk>::iterator chunk = textChunks.begin();
                  chunk != textChunks.end(); chunk++)
             {
-                // hb_direction_t dir = hb_script_get_horizontal_direction(chunk->script);
-                /* We always use HB_DIRECTION_LTR, because fribidi already made correct direction. */
-                hb_buffer_set_direction(buf, HB_DIRECTION_LTR/*dir*/); /* or LTR */
+                hb_direction_t dir = hb_script_get_horizontal_direction(chunk->script);
+                hb_buffer_set_direction(buf, dir); /* or LTR */
                 hb_buffer_set_script(buf, chunk->script); /* see hb-unicode.h */
                 //hb_buffer_set_language(buf, hb_language_from_string(language, strlen(language)));
                 
@@ -442,7 +446,9 @@ namespace Example
                 int sizer_y = 0; /* in FT coordinate system. */
                 
                 FT_Error fterr;
+                //unsigned start = (dir == HB_DIRECTION_LTR) ? 0 : glyph_count - 1;
                 for (unsigned j = 0; j < glyph_count; ++j) {
+                //for (unsigned j = 0; j < glyph_count; ++j) {
                     if ((fterr = FT_Load_Glyph(ft_face, glyph_info[j].codepoint, 0))) {
                         printf("load %08x failed fterr=%d.\n",  glyph_info[j].codepoint, fterr);
                     } else {
@@ -551,7 +557,7 @@ namespace Example
                     bottom -=  baseline_offset - bbox_h;
                     
                     /* draw the baseline */
-                    hline(sdl_surface, x, x + bbox_w, y, 0x0000ff00);
+                    hline(pixels, pitch, x, x + bbox_w, y, 0x0000ff00);
                 }
                 
                 if (HB_DIRECTION_IS_VERTICAL(hb_buffer_get_direction(buf))) {
@@ -565,51 +571,53 @@ namespace Example
                     top    -= baseline_shift;
                     bottom -= baseline_shift;
                     
-                    vline(sdl_surface, y, y + bbox_h, x, 0x0000ff00);
+                    vline(pixels, pitch, y, y + bbox_h, x, 0x0000ff00);
                 }
                 if (resized)
                     printf("origin %d,%d bbox l=%d r=%d t=%d b=%d\n",
                            x, y, left, right, top, bottom);
                 
                 /* +1/-1 are for the bbox borders be the next pixel outside the bbox itself */
-                hline(sdl_surface, left - 1, right + 1, top - 1, 0x00ff0000);
-                hline(sdl_surface, left - 1, right + 1, bottom + 1, 0x00ff0000);
-                vline(sdl_surface, top - 1, bottom + 1, left - 1, 0x00ff0000);
-                vline(sdl_surface, top - 1, bottom + 1, right + 1, 0x00ff0000);
+                hline(pixels, pitch, left - 1, right + 1, top - 1, 0x00ff0000);
+                hline(pixels, pitch, left - 1, right + 1, bottom + 1, 0x00ff0000);
+                vline(pixels, pitch, top - 1, bottom + 1, left - 1, 0x00ff0000);
+                vline(pixels, pitch, top - 1, bottom + 1, right + 1, 0x00ff0000);
                 
                 /* set rendering spanner */
                 ftr_params.gray_spans = spanner;
                 
                 /* initialize rendering part of the baton */
                 stuffbaton.pixels = NULL;
-                stuffbaton.first_pixel = (uint32_t*)sdl_surface->pixels;
-                stuffbaton.last_pixel = (uint32_t *) (((uint8_t *) sdl_surface->pixels) + sdl_surface->pitch*sdl_surface->h);
-                stuffbaton.pitch = sdl_surface->pitch;
-                stuffbaton.rshift = sdl_surface->format->Rshift;
-                stuffbaton.gshift = sdl_surface->format->Gshift;
-                stuffbaton.bshift = sdl_surface->format->Bshift;
+                stuffbaton.first_pixel = (uint32_t*)pixels;
+                stuffbaton.last_pixel = (uint32_t *) (((uint8_t *) pixels) + pitch * height);
+                stuffbaton.pitch = pitch;
+                stuffbaton.rshift = 0;
+                stuffbaton.gshift = 8;
+                stuffbaton.bshift = 16;
                 
                 /* render */
-                for (unsigned j=0; j < glyph_count; ++j)
+                for (unsigned j = 0; j < glyph_count; ++j)
                 {
-                    if ((fterr = FT_Load_Glyph(ft_face, glyph_info[j].codepoint, 0))) {
-                        printf("load %08x failed fterr=%d.\n",  glyph_info[j].codepoint, fterr);
+                    // We use reordering indexes to set letters to correct position for bidirectional text.
+                    int visiblePosition = reorderPosition[j];
+                    if ((fterr = FT_Load_Glyph(ft_face, glyph_info[visiblePosition].codepoint, 0))) {
+                        printf("load %08x failed fterr=%d.\n",  glyph_info[visiblePosition].codepoint, fterr);
                     } else {
                         if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
                             printf("glyph->format = %4s\n", (char *)&ft_face->glyph->format);
                         } else {
-                            int gx = x + (glyph_pos[j].x_offset/64);
-                            int gy = y - (glyph_pos[j].y_offset/64);
+                            int gx = x + (glyph_pos[visiblePosition].x_offset/64);
+                            int gy = y - (glyph_pos[visiblePosition].y_offset/64);
                             
-                            stuffbaton.pixels = (uint32_t *)(((uint8_t *) sdl_surface->pixels) + gy * sdl_surface->pitch) + gx;
+                            stuffbaton.pixels = (uint32_t *)(((uint8_t *) pixels) + gy * pitch) + gx;
                             
                             if ((fterr = FT_Outline_Render(ft_library, &ft_face->glyph->outline, &ftr_params)))
                                 printf("FT_Outline_Render() failed err=%d\n", fterr);
                         }
                     }
                     
-                    x += glyph_pos[j].x_advance/64;
-                    y -= glyph_pos[j].y_advance/64;
+                    x += glyph_pos[visiblePosition].x_advance/64;
+                    y -= glyph_pos[visiblePosition].y_advance/64;
                 }
                 
                 hb_buffer_clear_contents(buf);
@@ -620,15 +628,13 @@ namespace Example
             
             //}
             
-            SDL_UnlockSurface(sdl_surface);
+            SDL_UnlockTexture(sdlTexture);
             
             /* Blit our new image to our visible screen */
             
             SDL_RenderClear(renderer);
-            SDL_Texture  *sdlTexture = SDL_CreateTextureFromSurface(renderer, sdl_surface);
             SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
             SDL_RenderPresent(renderer);
-            SDL_DestroyTexture(sdlTexture);
             
             /* Handle SDL events */
             SDL_Event event;
@@ -644,20 +650,6 @@ namespace Example
                     case SDL_QUIT:
                         done = 1;
                         break;
-                        /*
-                         case SDL_VIDEORESIZE:
-                         resized = 1;
-                         //width = event.resize.w;
-                         //height = event.resize.h;
-                         screen = SDL_SetVideoMode(event.resize.w, event.resize.h, bpp, videoFlags);
-                         if (!screen) {
-                         fprintf(stderr, "Could not get a surface after resize: %s\n", SDL_GetError( ));
-                         exit(-1);
-                         }
-                         SDL_FreeSurface(sdl_surface);
-                         sdl_surface = SDL_CreateRGBSurface(0, width, height, 32, 0, 0 ,0, 0);
-                         break;
-                         */
                 }
             }
             
@@ -671,10 +663,7 @@ namespace Example
         
         FT_Done_FreeType(ft_library);
         
-        SDL_FreeSurface(sdl_surface);
-        
-        delete[] visibleText;
-        
+        SDL_DestroyTexture(sdlTexture);
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(screen);
         
