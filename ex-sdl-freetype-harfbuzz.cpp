@@ -1,9 +1,10 @@
-#include <stdlib.h>
+﻿#include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_render.h>
+#undef main
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -14,14 +15,27 @@
 #include <hb-ot.h>
 #include <string>
 
-#include <hb-ot.h>
 #include <vector>
 
 #include <fribidi.h>
 
+#ifdef _WIN32
+	#include <hb-ot-font.h>
+	#include <Windows.h>
+#endif
+
+// Lazzy fix for Release for VS
+#ifndef __FULLPATH_FILE__
+	#define __FULLPATH_FILE__ __FILE__
+#endif
+
 namespace Example
 {
-    const wchar_t *text = L"Ленивый рыжий кот شَدَّة latin العَرَبِية";
+#ifdef _WIN32
+	typedef unsigned int uint;
+#endif
+
+	const wchar_t *text = L"Ленивый рыжий кот شَدَّة latin العَرَبِية";
     
     typedef struct _spanner_baton_t {
         /* rendering part - assumes 32bpp surface */
@@ -295,7 +309,7 @@ namespace Example
             hb_script_t script = hb_unicode_script(ufuncs, *currentText);
             
             // Skip for HB_SCRIPT_INHERITED, because it can be diacritics.
-            if (script != currentScript && script != HB_SCRIPT_INHERITED)
+            if ((script != currentScript && script != HB_SCRIPT_INHERITED))
             {
                 TextChunk chunk;
                 chunk.text   = chunkStart;
@@ -319,9 +333,8 @@ namespace Example
         }
         
         return res;
-    }
-    
-    
+    }    
+
     int main () {
         int ptSize = 50*64;
         int device_hdpi = 72;
@@ -332,9 +345,14 @@ namespace Example
         assert(!FT_Init_FreeType(&ft_library));
         
         
-        std::string cppFile(__FILE__);
-        std::string sourceFolder = cppFile.substr(0, cppFile.rfind("/"));
+        std::string cppFile(__FULLPATH_FILE__);
+#ifdef _WIN32
+        std::string sourceFolder = cppFile.substr(0, cppFile.rfind("\\"));
+#else
+		std::string sourceFolder = cppFile.substr(0, cppFile.rfind("/"));
+#endif
         std::string fontFilename = sourceFolder + "/fonts/arial.ttf";
+		printf( "%s", cppFile.c_str());
         
         /* Load our fonts */
         FT_Face ft_face;
@@ -409,8 +427,13 @@ namespace Example
                 //hb_buffer_set_language(buf, hb_language_from_string(language, strlen(language)));
                 
                 /* Layout the text */
-                hb_buffer_add_utf32(buf, (const uint32_t*)chunk->text, chunk->length, 0, chunk->length);
+#ifdef _WIN32
+				hb_buffer_add_utf16(buf, (const uint16_t*)chunk->text, chunk->length, 0, chunk->length);
+#else
+				hb_buffer_add_utf32(buf, (const uint32_t*)chunk->text, chunk->length, 0, chunk->length);
+#endif
                 hb_shape(hb_ft_font, buf, NULL, 0);
+
                 
                 unsigned int         glyph_count;
                 hb_glyph_info_t     *glyph_info   = hb_buffer_get_glyph_infos(buf, &glyph_count);
