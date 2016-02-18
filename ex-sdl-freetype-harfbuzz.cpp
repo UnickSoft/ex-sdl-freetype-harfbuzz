@@ -352,7 +352,6 @@ namespace Example
 		std::string sourceFolder = cppFile.substr(0, cppFile.rfind("/"));
 #endif
         std::string fontFilename = sourceFolder + "/fonts/arial.ttf";
-		printf( "%s", cppFile.c_str());
         
         /* Load our fonts */
         FT_Face ft_face;
